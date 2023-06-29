@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flask Model Generator</title>
+    <style>
+        /* CSS styles */
+    </style>
+</head>
+<body>
+    <h1>Flask Model Generator</h1>
+
+    <label for="model-name">Model Class Name:</label>
+    <input type="text" id="model-name" />
+
+    <h2>Columns:</h2>
+    <div id="column-list"></div>
+
+    <button id="add-column" onclick="addColumn()">Add Column</button>
+    <button id="generate-code" onclick="generateCode()">Generate Code</button>
+
+    <pre id="code-snippet"></pre>
+
+    <div id="warning-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <p>Error: Only one column can be selected as the primary key.</p>
+        </div>
+    </div>
+
+    <script>
+        // JavaScript code
+
+        // Add event listener to close the warning modal
+        document.getElementsByClassName("close")[0].addEventListener("click", function () {
+            document.getElementById("warning-modal").style.display = "none";
+        });
+
+        function addColumn() {
+            const columnList = document.getElementById("column-list");
+
+            const columnRow = document.createElement("div");
+            columnRow.className = "column-row";
+
+            const columnNameInput = document.createElement("input");
+            columnNameInput.type = "text";
+            columnNameInput.className = "column-name";
+
+            const columnTypeSelect = document.createElement("select");
+            columnTypeSelect.className = "column-type";
+            const columnTypes = [
+                "Integer", "SmallInteger", "BigInteger", "Float", "Numeric", "Boolean", "String", "Text",
+                "Date", "DateTime", "Time", "Interval", "Enum", "JSON", "JSONB", "UUID", "Array", "HSTORE",
+                "Inet", "CIDR", "MACADDR", "TSVECTOR"
+            ];
+            columnTypes.forEach(function (type) {
+                const option = document.createElement("option");
+                option.value = type;
+                option.textContent = type;
+                columnTypeSelect.appendChild(option);
+            });
+
+            const primaryKeyCheckbox = document.createElement("input");
+            primaryKeyCheckbox.type = "checkbox";
+            primaryKeyCheckbox.className = "primary-key";
+            primaryKeyCheckbox.addEventListener("change", function () {
+                checkPrimaryKeys();
+            });
+
+            const primaryKeyLabel = document.createElement("label");
+            primaryKeyLabel.textContent = "Primary Key";
+
+            const uniqueCheckbox = document.createElement("input");
+            uniqueCheckbox.type = "checkbox";
+            uniqueCheckbox.className = "unique";
+
+            const uniqueLabel = document.createElement("label");
+            uniqueLabel.textContent = "Unique";
+
+            const notNullCheckbox = document.createElement("input");
+            notNullCheckbox.type = "checkbox";
+            notNullCheckbox.className = "not-null";
+
+            const notNullLabel = document.createElement("label");
+            notNullLabel.textContent = "Not Null";
+
+            const autoIncrementCheckbox = document.createElement("input");
+            autoIncrementCheckbox.type = "checkbox";
+            autoIncrementCheckbox.className = "auto-increment";
+
+            const autoIncrementLabel = document.createElement("label");
+            autoIncrementLabel.textContent = "Auto Increment";
+
+            const removeButton = document.createElement("button");
+            removeButton.textContent = "Remove";
+            removeButton.className = "remove-column";
+            removeButton.onclick = function () {
+                removeColumn(removeButton);
+            };
+
+            columnRow.appendChild(columnNameInput);
+            columnRow.appendChild(columnTypeSelect);
+            columnRow.appendChild(primaryKeyCheckbox);
+            columnRow.appendChild(primaryKeyLabel);
+            columnRow.appendChild(uniqueCheckbox);
+            columnRow.appendChild(uniqueLabel);
+            columnRow.appendChild(notNullCheckbox);
+            columnRow.appendChild(notNullLabel);
+            columnRow.appendChild(autoIncrementCheckbox);
+            columnRow.appendChild(autoIncrementLabel);
+            columnRow.appendChild(removeButton);
+
+            columnList.appendChild(columnRow);
+        }
+
+        function removeColumn(removeButton) {
+            const columnRow = removeButton.parentNode;
+            const columnList = document.getElementById("column-list");
+            columnList.removeChild(columnRow);
+        }
+
+        function checkPrimaryKeys() {
+            const primaryKeyCheckboxes = document.getElementsByClassName("primary-key");
+            let primaryKeyCount = 0;
+
+            for (let i = 0; i < primaryKeyCheckboxes.length; i++) {
+                if (primaryKeyCheckboxes[i].checked) {
+                    primaryKeyCount++;
+                }
+            }
+
+            if (primaryKeyCount > 1) {
+                document.getElementById("warning-modal").style.display = "block";
+            }
+        }
+
+        function generateCode() {
+            const modelName = document.getElementById("model-name").value.trim();
+
+            let code = `class ${modelName}(db.Model):\n`;
+            code += `    __tablename__ = '${modelName.toLowerCase()}'\n\n`;
+
+            const columnRows = document.getElementsByClassName("column-row");
+            let primaryKeyCount = 0;
+
+            for (let i = 0; i < columnRows.length; i++) {
+                const columnName = columnRows[i].getElementsByClassName("column-name")[0].value.trim();
+                const columnType = columnRows[i].getElementsByClassName("column-type")[0].value;
+
+                const primaryKeyCheckbox = columnRows[i].getElementsByClassName("primary-key")[0];
+                const primaryKey = primaryKeyCheckbox.checked;
+
+                const uniqueCheckbox = columnRows[i].getElementsByClassName("unique")[0];
+                const unique = uniqueCheckbox.checked;
+
+                const notNullCheckbox = columnRows[i].getElementsByClassName("not-null")[0];
+                const notNull = notNullCheckbox.checked;
+
+                const autoIncrementCheckbox = columnRows[i].getElementsByClassName("auto-increment")[0];
+                const autoIncrement = autoIncrementCheckbox.checked;
+
+                if (primaryKey) {
+                    primaryKeyCount++;
+                }
+
+                let columnOptions = "";
+                if (primaryKey || unique || notNull || autoIncrement) {
+                    const options = [];
+                    if (primaryKey) {
+                        options.push("primary_key=True");
+                    }
+                    if (unique) {
+                        options.push("unique=True");
+                    }
+                    if (notNull) {
+                        options.push("nullable=False");
+                    }
+                    if (autoIncrement) {
+                        options.push("autoincrement=True");
+                    }
+                    columnOptions = `, ${options.join(", ")}`;
+                }
+
+                code += `    ${columnName} = db.Column(db.${columnType}${columnOptions})\n`;
+            }
+
+            if (primaryKeyCount > 1) {
+                document.getElementById("warning-modal").style.display = "block";
+                return;
+            }
+
+            code += `\n    def __repr__(self):\n`;
+            code += `        return '<${modelName}(${modelName}Id={})>'.format(self.${columnRows[0].getElementsByClassName("column-name")[0].value.trim()})`;
+
+            document.getElementById("code-snippet").textContent = code;
+        }
+    </script>
+</body>
+</html>
